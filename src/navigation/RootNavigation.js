@@ -2,7 +2,7 @@ import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import CompassScreen from "../screens/CompassScreen";
-import PinsScreen from "../screens/PinsScreen";
+import PinsScreen from "../screens/PinScreen";
 
 const Stack = createStackNavigator();
 
@@ -11,12 +11,15 @@ export default function RootNavigator() {
     <NavigationContainer>
       <Stack.Navigator
         initialRouteName="Compass"
-        screenOptions={{ headerTitleAlign: "center", headerShown: false }}
+        screenOptions={{
+          headerTitleAlign: "center",
+          headerShown: false,
+        }}
       >
         <Stack.Screen
           name="Compass"
           component={CompassScreen}
-          options={{ title: "Gradient Compass" }}
+          options={{ title: "Trail Compass" }}
         />
         <Stack.Screen
           name="Pins"

@@ -20,39 +20,39 @@ export default function CompassScreen({ navigation }) {
   const [coords, setCoords] = useState(null);
   const [pins, setPins] = useState([]);
   const [snack, setSnack] = useState("");
-  const [bob] = useState(() => new Animated.Value(0)); // given
 
-  // TODO(1): Ask for location permission, get initial position, and start heading watcher
+  const [bob] = useState(() => new Animated.Value(0));
+
   useEffect(() => {
     let headingSub = null;
     let mounted = true;
 
-    const askForPermission = async () => {
-      // TODO a) Ask for location permission
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        setSnack("Location permission denied");
+        return;
+      }
 
-      // TODO b) Get One-time position and save the coordinates
+      const pos = await Location.getCurrentPositionAsync({});
+      if (mounted) setCoords(pos.coords);
 
-      //* (GIVEN): Heading watcher (0..360 degrees)
       headingSub = await Location.watchHeadingAsync(({ trueHeading }) => {
         if (!mounted) return;
         if (typeof trueHeading === "number") setHeading(trueHeading);
       });
 
-      // TODO c) Load saved pins
       const saved = await loadPins();
       if (mounted) setPins(saved);
-    };
+    })();
 
-    askForPermission();
-
-    // Cleaning the component
     return () => {
       mounted = false;
       headingSub?.remove?.();
     };
   }, []);
 
-  //* (GIVEN): gentle bob animation
+  // Gentle bob loop
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
@@ -74,7 +74,40 @@ export default function CompassScreen({ navigation }) {
     return () => loop.stop();
   }, [bob]);
 
-  //* (GIVEN): Gradient orientation from heading (0° = up, clockwise)
+  const dropPin = async () => {
+    if (!coords) {
+      setSnack("No GPS fix yet");
+      return;
+    }
+    const pin = {
+      id: Date.now().toString(),
+      lat: coords.latitude,
+      lon: coords.longitude,
+      heading: heading ?? 0,
+      ts: nowISO(),
+    };
+    const next = [pin, ...pins];
+    setPins(next);
+    await savePins(next);
+    setSnack("Pin saved");
+  };
+
+  const copyCoords = async () => {
+    if (!coords) return;
+    const text = `${fmt(coords.latitude)}, ${fmt(coords.longitude)}`;
+    await Clipboard.setStringAsync(text);
+    setSnack("Copied coordinates");
+  };
+
+  const shareCoords = async () => {
+    if (!coords) return;
+    const text = `I am here: ${fmt(coords.latitude)}, ${fmt(
+      coords.longitude
+    )} (${toCardinal(heading ?? 0)} ${Math.round(heading ?? 0)}°)`;
+    await Share.share({ message: text });
+  };
+
+  // Gradient orientation from heading (0° = up, clockwise)
   const pointsForHeading = (deg = 0) => {
     const rad = (deg * Math.PI) / 180;
     const vx = Math.sin(rad);
@@ -91,39 +124,25 @@ export default function CompassScreen({ navigation }) {
     };
   };
 
-  const dropPin = async () => {
-    if (!coords) {
-      setSnack("No GPS fix yet");
-      return;
-    }
-    // TODO(2): push new pin {id, lat, lon, heading, ts} to state and savePins(next)
-    setSnack("TODO: save pin");
-  };
-
-  const copyCoords = async () => {
-    if (!coords) {
-      setSnack("TODO: copy coords");
-      return;
-    }
-    // TODO(3): Clipboard.setStringAsync("lat, lon") then snackbar
-  };
-
-  const shareCoords = async () => {
-    if (!coords) {
-      setSnack("TODO: share");
-      return;
-    }
-    // TODO(4): Share.share with message including coords + heading + cardinal
-  };
-
-  // Make DARK end point opposite heading: add 180°
+  // Make the DARK end point opposite the heading: add 180°
   const { start, end } = pointsForHeading(((heading ?? 0) + 180) % 360);
-  const bobY = bob.interpolate({ inputRange: [0, 1], outputRange: [0, -8] });
+
+  // Only bob (no tilt rotates)
+  const gradientTransform = {
+    transform: [
+      {
+        translateY: bob.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, -8],
+        }),
+      },
+    ],
+  };
 
   return (
     <>
       <Appbar.Header>
-        <Appbar.Content title="Gradient Compass" />
+        <Appbar.Content title="Trail Compass" />
         <Appbar.Action
           icon="map-marker"
           onPress={() => navigation.navigate("Pins")}
@@ -133,9 +152,7 @@ export default function CompassScreen({ navigation }) {
       <View style={styles.container}>
         <Card style={styles.card}>
           <Card.Content style={styles.center}>
-            <Animated.View
-              style={[styles.gradWrap, { transform: [{ translateY: bobY }] }]}
-            >
+            <Animated.View style={[styles.gradWrap, gradientTransform]}>
               <LinearGradient
                 start={start}
                 end={end}
@@ -149,8 +166,14 @@ export default function CompassScreen({ navigation }) {
             </Text>
             <Chip>{toCardinal(heading ?? 0)}</Chip>
 
+            <Text style={styles.coords}>
+              {coords
+                ? `${fmt(coords.latitude)}, ${fmt(coords.longitude)}`
+                : "Locating…"}
+            </Text>
+
             <View style={styles.actionsRow}>
-              <Button onPress={dropPin}>Save</Button>
+              <Button onPress={dropPin}>Drop Pin</Button>
               <Button onPress={copyCoords}>Copy</Button>
               <IconButton icon="share-variant" onPress={shareCoords} />
             </View>
@@ -173,14 +196,20 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
   card: { borderRadius: 16 },
   center: { alignItems: "center", gap: 12, paddingVertical: 20 },
+
   gradWrap: {
     width: 180,
     height: 180,
     borderRadius: 16,
     overflow: "hidden",
     elevation: 4,
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
   },
   gradient: { flex: 1 },
+
   headingText: { fontWeight: "700" },
   coords: { opacity: 0.8, marginTop: 6, letterSpacing: 0.5 },
   actionsRow: {
