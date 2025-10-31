@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+// src/screens/CompassScreen.js
+import React, { useEffect, useRef, useState } from "react";
 import { View, StyleSheet, Share, Animated, Easing } from "react-native";
 import {
   Appbar,
@@ -21,7 +22,8 @@ export default function CompassScreen({ navigation }) {
   const [pins, setPins] = useState([]);
   const [snack, setSnack] = useState("");
 
-  const [bob] = useState(() => new Animated.Value(0));
+  // useRef for Animated value (prevents re-creation)
+  const bob = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let headingSub = null;
@@ -33,13 +35,11 @@ export default function CompassScreen({ navigation }) {
         setSnack("Location permission denied");
         return;
       }
-
       const pos = await Location.getCurrentPositionAsync({});
       if (mounted) setCoords(pos.coords);
 
       headingSub = await Location.watchHeadingAsync(({ trueHeading }) => {
-        if (!mounted) return;
-        if (typeof trueHeading === "number") setHeading(trueHeading);
+        if (mounted && typeof trueHeading === "number") setHeading(trueHeading);
       });
 
       const saved = await loadPins();
@@ -75,10 +75,7 @@ export default function CompassScreen({ navigation }) {
   }, [bob]);
 
   const dropPin = async () => {
-    if (!coords) {
-      setSnack("No GPS fix yet");
-      return;
-    }
+    if (!coords) return setSnack("No GPS fix yet");
     const pin = {
       id: Date.now().toString(),
       lat: coords.latitude,
@@ -124,10 +121,9 @@ export default function CompassScreen({ navigation }) {
     };
   };
 
-  // Make the DARK end point opposite the heading: add 180°
+  // Make the dark end point opposite the heading: +180°
   const { start, end } = pointsForHeading(((heading ?? 0) + 180) % 360);
 
-  // Only bob (no tilt rotates)
   const gradientTransform = {
     transform: [
       {
@@ -143,6 +139,7 @@ export default function CompassScreen({ navigation }) {
     <>
       <Appbar.Header>
         <Appbar.Content title="Trail Compass" />
+        <Appbar.Action icon="map" onPress={() => navigation.navigate("Map")} />
         <Appbar.Action
           icon="map-marker"
           onPress={() => navigation.navigate("Pins")}
@@ -196,7 +193,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
   card: { borderRadius: 16 },
   center: { alignItems: "center", gap: 12, paddingVertical: 20 },
-
   gradWrap: {
     width: 180,
     height: 180,
@@ -209,7 +205,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
   },
   gradient: { flex: 1 },
-
   headingText: { fontWeight: "700" },
   coords: { opacity: 0.8, marginTop: 6, letterSpacing: 0.5 },
   actionsRow: {
