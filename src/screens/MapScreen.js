@@ -21,7 +21,7 @@ export default function MapScreen() {
   const [pins, setPins] = useState([]);
   const [mapType, setMapType] = useState("standard");
 
-  //! 1) Load saved pins (already implemented for you)
+  //? 1) Load saved pins (already implemented for you)
   useEffect(() => {
     (async () => {
       const saved = await loadPins();
@@ -29,7 +29,7 @@ export default function MapScreen() {
     })();
   }, []);
 
-  //! 2) Request permission + get current location (already implemented)
+  //? 2) Request permission + get current location (already implemented)
   useEffect(() => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -51,7 +51,7 @@ export default function MapScreen() {
     })();
   }, []);
 
-  //! 3) Center on me (students can later switch to animateCamera once MapView exists)
+  //? 3) Center on me (students can later switch to animateCamera once MapView exists)
   const centerOnMe = async () => {
     const { coords } = await Location.getCurrentPositionAsync({});
     setMe({ latitude: coords.latitude, longitude: coords.longitude });
@@ -62,10 +62,10 @@ export default function MapScreen() {
       latitudeDelta: 0.01,
       longitudeDelta: 0.01,
     }));
-    // ⭐ Later: use mapRef.animateCamera(...) after you add MapView
+    // Later: use mapRef.animateCamera(...) after you add MapView
   };
 
-  //! 4) Add/Remove/Clear pins (logic is ready; you’ll call these from Map events)
+  //? 4) Add/Remove/Clear pins (logic is ready; you’ll call these from Map events)
   const addPin = ({ latitude, longitude }) => {
     const pin = {
       id: String(Date.now()),
